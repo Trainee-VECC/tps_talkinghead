@@ -1,4 +1,5 @@
 import matplotlib
+import cv2
 matplotlib.use('Agg')
 import sys
 import yaml
@@ -63,13 +64,87 @@ def load_checkpoints(config_path, checkpoint_path, device):
     
     return inpainting, kp_detector, dense_motion_network, avd_network
 
-
+def get_keypoints(image,kp_detector,device):
+    with torch.no_grad():
+        image = torch.tensor(image[np.newaxis].astype(np.float32)).permute(0, 3, 1, 2)
+        image = image.to(device)
+        key_points=kp_detector(image)
+    return key_points
+    
+def live_video(source_kp,current_frame):
+    cam=cv2.VideoCapture(0)
+    if cam is None or not cam.isOpened():
+        raise ValueError('Camera Not Found')
+        
+    print('-----------USE SPACEBAR TO CAPTURE BASEFRAME----------')
+    print('-----------USE ESCAPE TO EXIT----------')
+    
+    while True:
+        ret,frame=cam.read()
+        if ret:
+            
+            frame=cv2.flip(frame,1)
+            h,w,c=frame.shape
+            cv2.rectangle(frame, ((w-h)//2,0), ((w+h)//2,h), (0,255,255), 5)
+            cv2.imshow('driving_video',frame)
+            frame=frame[:,:,[2,1,0]]
+            
+            k = cv2.waitKey(20)
+            if k%256 == 27: 
+                #ESC is pressed
+                print("---------CLOSING WINDOWS---------")
+                break
+            elif k%256 == 32:
+                # SPACE pressed
+                base_frame=frame[:,(w-h)//2:(w+h)//2,:]
+                print("---------FRAME SAVED---------")
+                break
+        else:
+            print("--------- FRAME NOT FOUND ---------")
+            print("---------CLOSING WINDOWS---------")
+            break
+            
+    base_frame=resize(base_frame,(256,256))[...,:3]   
+    kp_source = get_keypoints(base_frame,kp_detector)
+    kp_driving_initial=kp_source
+    
+    while True:
+        ret,frame=cam.read()
+        if ret:
+            frame=cv2.flip(frame,1)
+            h,w,c=frame.shape
+            cv2.rectangle(frame, ((w-h)//2,0), ((w+h)//2,h), (0,255,255), 5)
+            cv2.imshow('driving_video',frame)
+            
+            driving_frame=frame[:,(w-h)//2:(w+h)//2,:]
+            cv2.imshow('frames',driving_frame)
+            
+            driving_frame=driving_frame[:,:,[2,1,0]]
+            driving_frame=resize(driving_frame,(256,256))[...,:3]
+            
+            kp_driving=get_keypoint(driving_frame)
+            
+            k = cv2.waitKey(20)
+            
+            if k%256 == 27: 
+                #ESC is pressed
+                print("---------CLOSING WINDOWS---------")
+                break
+        else:
+            print("--------- FRAME NOT FOUND ---------")
+            print("---------CLOSING WINDOWS---------")
+            break
+                   
+    cam.release()
+    cv2.destroyAllWindows()
+    
 def make_animation(source_image, driving_video, inpainting_network, kp_detector, dense_motion_network, avd_network, device, mode = 'relative'):
     assert mode in ['standard', 'relative', 'avd']
     with torch.no_grad():
         predictions = []
         source = torch.tensor(source_image[np.newaxis].astype(np.float32)).permute(0, 3, 1, 2)
         source = source.to(device)
+        print(source.shape)
         driving = torch.tensor(np.array(driving_video)[np.newaxis].astype(np.float32)).permute(0, 4, 1, 2, 3).to(device)
         kp_source = kp_detector(source)
         kp_driving_initial = kp_detector(driving[:, :, 0])
@@ -92,35 +167,6 @@ def make_animation(source_image, driving_video, inpainting_network, kp_detector,
 
             predictions.append(np.transpose(out['prediction'].data.cpu().numpy(), [0, 2, 3, 1])[0])
     return predictions
-
-
-def find_best_frame(source, driving, cpu):
-    import face_alignment
-
-    def normalize_kp(kp):
-        kp = kp - kp.mean(axis=0, keepdims=True)
-        area = ConvexHull(kp[:, :2]).volume
-        area = np.sqrt(area)
-        kp[:, :2] = kp[:, :2] / area
-        return kp
-
-    fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=True,
-                                      device= 'cpu' if cpu else 'cuda')
-    kp_source = fa.get_landmarks(255 * source)[0]
-    kp_source = normalize_kp(kp_source)
-    norm  = float('inf')
-    frame_num = 0
-    for i, image in tqdm(enumerate(driving)):
-        try:
-            kp_driving = fa.get_landmarks(255 * image)[0]
-            kp_driving = normalize_kp(kp_driving)
-            new_norm = (np.abs(kp_source - kp_driving) ** 2).sum()
-            if new_norm < norm:
-                norm = new_norm
-                frame_num = i
-        except:
-            pass
-    return frame_num
 
 
 if __name__ == "__main__":
