@@ -27,7 +27,7 @@ class KPDetector(nn.Module):
         self.detector=detector
         self.fg_encoder = models.resnet18(pretrained=False)
         num_features = self.fg_encoder.fc.in_features
-        self.fg_encoder.fc = nn.Linear(num_features,(self.num_tps)*5*2)
+        self.fg_encoder.fc = nn.Linear(num_features,(self.num_tps-10)*5*2)
         self.indexes=[21,67,151,297,251,  #forehead
                       46,66,8,296,276,    #eyebrows
                      226,161,158,132,163, #right eye
@@ -40,29 +40,34 @@ class KPDetector(nn.Module):
                      330,280,376,361,288] #left cheek
         
     def forward(self, image):
+        print('kp_reached')
         device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
-        fg_kp = self.fg_encoder(image) 
-        print(fg_kp.get_device())
-        frame=np.transpose(image.detach().cpu().numpy(), [0, 2, 3, 1])[0]*255
-        frame=frame.astype(np.uint8)
-        frame=mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)
-        data=detector.detect(frame)
-        if len(data.face_landmarks)>0:
-            arr=[]
-            for j in range(478):
-                i=data.face_landmarks[0][j]
-                arr.append([i.x,i.y])
-            arr=np.array(arr,dtype=np.float16)
-            arr=MinMaxScaler().fit_transform(arr)
-            flag=True
-        else:
-            arr=np.zeros((478,2)) 
-            flag=False
-        arr=arr[self.indexes]
-        mp_kp=torch.tensor(arr,dtype=torch.float,device=device)
-        fg_kp = self.fg_encoder(image)  
+        fg_kp = self.fg_encoder(image)       
+        frames=image.cpu().numpy()
+        frames=(frames*255)+0.5
+        frames=frames.astype(np.uint8)
+        mp_kp=[]
+        for frame in frames:
+            data=detector.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=frame))
+            if len(data.face_landmarks)>0:
+                arr=[]
+                for j in range(478):
+                    i=data.face_landmarks[0][j]
+                    arr.append([i.x,i.y])
+                arr=np.array(arr,dtype=np.float16)
+                arr=MinMaxScaler().fit_transform(arr)
+                flag=True
+            else:
+                arr=np.zeros((478,2)) 
+                flag=False
+            arr=arr[self.indexes]
+            mp_kp.append(arr)
+            
+        print('mp_done')
+        mp_kp=torch.tensor(mp_kp,dtype=torch.float,device=device) 
         bs, _, = fg_kp.shape
-        fg_kp=torch.cat([mp_kp,fg_kp.view((self.num_tps)*5,2)])
+        fg_kp=torch.cat([mp_kp,fg_kp.view(-1,(self.num_tps-10)*5,2)],axis=1)
+        print(fg_kp.shape)
         fg_kp = torch.sigmoid(fg_kp)
-        out = {'fg_kp': fg_kp.view(bs,(self.num_tps+10)*5, -1),'face_found':flag}
+        out = {'fg_kp': fg_kp.view(bs,(self.num_tps)*5, -1),'face_found':flag}
         return out
