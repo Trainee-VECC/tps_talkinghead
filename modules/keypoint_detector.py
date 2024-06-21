@@ -67,7 +67,7 @@ class KPDetector(nn.Module):
         mp_kp=torch.tensor(mp_kp,dtype=torch.float,device=device) 
         bs, _, = fg_kp.shape
         fg_kp=torch.cat([mp_kp,fg_kp.view(-1,(self.num_tps-10)*5,2)],axis=1)
-        print(fg_kp.shape)
         fg_kp = torch.sigmoid(fg_kp)
         out = {'fg_kp': fg_kp.view(bs,(self.num_tps)*5, -1),'face_found':flag}
+        print('kp_done')
         return out
