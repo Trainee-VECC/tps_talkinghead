@@ -40,11 +40,11 @@ def read_video(name, frame_shape):
         video_array = video_array.reshape((-1,) + frame_shape)
         video_array = np.moveaxis(video_array, 1, 2)
     elif name.lower().endswith('.gif') or name.lower().endswith('.mp4') or name.lower().endswith('.mov'):
-        video = mimread(name)
+        video = mimread(name,memtest=False)
         if len(video[0].shape) == 2:
             video = [gray2rgb(frame) for frame in video]
         if frame_shape is not None:
-            video = np.array([resize(frame, frame_shape) for frame in video])
+            video = np.array([resize(frame, (512,512)) for frame in video])
         video = np.array(video)
         if video.shape[-1] == 4:
             video = video[..., :3]
@@ -63,7 +63,7 @@ class FramesDataset(Dataset):
       - folder with all frames
     """
 
-    def __init__(self, root_dir, frame_shape=(256, 256, 3), id_sampling=False, is_train=True,
+    def __init__(self, root_dir, frame_shape=(512, 512,3), id_sampling=False, is_train=True,
                  random_seed=0, pairs_list=None, augmentation_params=None):
         self.root_dir = root_dir
         self.videos = os.listdir(root_dir)
@@ -103,13 +103,9 @@ class FramesDataset(Dataset):
         return len(self.videos)
 
     def __getitem__(self, idx):
-            
-        if self.is_train and self.id_sampling:   
-            name = self.videos[idx]
-            path = np.random.choice(glob.glob(os.path.join(self.root_dir, name + '*.mp4')))
-        else:
-            name = self.videos[idx]
-            path = os.path.join(self.root_dir, name)
+        
+        name = self.videos[idx]
+        path = os.path.join(self.root_dir, name)
 
         video_name = os.path.basename(path)
         if self.is_train and os.path.isdir(path):
@@ -119,7 +115,7 @@ class FramesDataset(Dataset):
             frame_idx = np.sort(np.random.choice(num_frames, replace=True, size=2))
             
             if self.frame_shape is not None:
-                resize_fn = partial(resize, output_shape=self.frame_shape)
+                resize_fn = partial(resize, output_shape=(512,512))
             else:
                 resize_fn = img_as_float32
 
@@ -133,8 +129,7 @@ class FramesDataset(Dataset):
             video_array = read_video(path, frame_shape=self.frame_shape)
             
             num_frames = len(video_array)
-            frame_idx = np.sort(np.random.choice(num_frames, replace=True, size=2)) if self.is_train else range(
-                num_frames)
+            frame_idx = np.sort(np.random.choice(num_frames, replace=True, size=2)) if self.is_train else range(num_frames)
             video_array = video_array[frame_idx]
             
 

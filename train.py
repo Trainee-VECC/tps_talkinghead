@@ -52,11 +52,14 @@ def train(config, inpainting_network, kp_detector, bg_predictor, dense_motion_ne
     with Logger(log_dir=log_dir, visualizer_params=config['visualizer_params'], 
                 checkpoint_freq=train_params['checkpoint_freq']) as logger:
         for epoch in trange(start_epoch, train_params['num_epochs']):
+            print(epoch)
             for x in dataloader:
+                
+                print('started')
                 if(torch.cuda.is_available()):
                     x['driving'] = x['driving'].cuda()
                     x['source'] = x['source'].cuda()
-
+                
                 losses_generator, generated = generator_full(x, epoch)
                 loss_values = [val.mean() for val in losses_generator.values()]
                 loss = sum(loss_values)
@@ -75,7 +78,8 @@ def train(config, inpainting_network, kp_detector, bg_predictor, dense_motion_ne
                 
                 losses = {key: value.mean().detach().data.cpu().numpy() for key, value in losses_generator.items()}
                 logger.log_iter(losses=losses)
-
+                print('done')
+                
             scheduler_optimizer.step()
             if bg_predictor:
                 scheduler_bg_predictor.step()
