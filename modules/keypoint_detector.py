@@ -40,7 +40,6 @@ class KPDetector(nn.Module):
                      330,280,376,361,288] #left cheek
         
     def forward(self, image):
-        print('kp_reached')
         device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
         fg_kp = self.fg_encoder(image)       
         frames=image.cpu().numpy()
@@ -61,13 +60,10 @@ class KPDetector(nn.Module):
                 arr=np.zeros((478,2)) 
                 flag=False
             arr=arr[self.indexes]
-            mp_kp.append(arr)
-            
-        print('mp_done')
+            mp_kp.append(arr)       
         mp_kp=torch.tensor(mp_kp,dtype=torch.float,device=device) 
         bs, _, = fg_kp.shape
         fg_kp=torch.cat([mp_kp,fg_kp.view(-1,(self.num_tps-10)*5,2)],axis=1)
         fg_kp = torch.sigmoid(fg_kp)
         out = {'fg_kp': fg_kp.view(bs,(self.num_tps)*5, -1),'face_found':flag}
-        print('kp_done')
         return out

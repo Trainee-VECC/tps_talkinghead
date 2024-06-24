@@ -68,7 +68,6 @@ class FramesDataset(Dataset):
         self.root_dir = root_dir
         self.videos = os.listdir(root_dir)
         self.frame_shape = frame_shape
-        print(self.frame_shape)
         self.pairs_list = pairs_list
         self.id_sampling = id_sampling
 

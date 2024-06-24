@@ -54,8 +54,6 @@ def train(config, inpainting_network, kp_detector, bg_predictor, dense_motion_ne
         for epoch in trange(start_epoch, train_params['num_epochs']):
             print(epoch)
             for x in dataloader:
-                
-                print('started')
                 if(torch.cuda.is_available()):
                     x['driving'] = x['driving'].cuda()
                     x['source'] = x['source'].cuda()
@@ -78,7 +76,7 @@ def train(config, inpainting_network, kp_detector, bg_predictor, dense_motion_ne
                 
                 losses = {key: value.mean().detach().data.cpu().numpy() for key, value in losses_generator.items()}
                 logger.log_iter(losses=losses)
-                print('done')
+
                 
             scheduler_optimizer.step()
             if bg_predictor:
