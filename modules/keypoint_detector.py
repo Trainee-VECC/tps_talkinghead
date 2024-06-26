@@ -65,5 +65,6 @@ class KPDetector(nn.Module):
         bs, _, = fg_kp.shape
         fg_kp=torch.cat([mp_kp,fg_kp.view(-1,(self.num_tps-10)*5,2)],axis=1)
         fg_kp = torch.sigmoid(fg_kp)
+        fg_kp = fg_kp * 2 - 1
         out = {'fg_kp': fg_kp.view(bs,(self.num_tps)*5, -1),'face_found':flag}
         return out
