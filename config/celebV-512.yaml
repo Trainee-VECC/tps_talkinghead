@@ -35,10 +35,10 @@ model_params:
 
 train_params:
   num_epochs: 100
-  num_repeats: 10
+  num_repeats: 2
   epoch_milestones: [70, 90]
   lr_generator: 2.0e-4
-  batch_size: 28
+  batch_size: 8
   scales: [1, 0.5, 0.25, 0.125]
   dataloader_workers: 12
   checkpoint_freq: 10
